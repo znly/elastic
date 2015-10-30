@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"testing"
+	"time"
 )
 
 func TestUpdateViaScript(t *testing.T) {
@@ -314,6 +315,11 @@ func TestUpdateViaScriptIntegration(t *testing.T) {
 
 func TestUpdateReturnsErrorOnFailure(t *testing.T) {
 	client := setupTestClientAndCreateIndex(t)
+
+	// Travis lags sometimes
+	if isTravis() {
+		time.Sleep(2 * time.Second)
+	}
 
 	// Ensure that no tweet with id #1 exists
 	exists, err := client.Exists().Index(testIndexName).Type("tweet").Id("1").Do()
