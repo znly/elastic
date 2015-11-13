@@ -26,24 +26,30 @@ var (
 //
 // The func tries to parse error details as returned from Elasticsearch
 // and encapsulates them in type elastic.Error.
-func checkResponse(req *http.Request, res *http.Response) error {
+func checkResponse(req *http.Request, res *http.Response, ignoreErrors ...int) error {
 	// 200-299 are valid status codes
 	if res.StatusCode >= 200 && res.StatusCode <= 299 {
 		return nil
 	}
-	// HEAD requests with 404 are not an error
-	if req.Method == "HEAD" && res.StatusCode == 404 {
-		return nil
+	// Ignore certain errors?
+	for _, code := range ignoreErrors {
+		if code == res.StatusCode {
+			return nil
+		}
 	}
+	return createResponseError(res)
+}
+
+func createResponseError(res *http.Response) error {
 	if res.Body == nil {
 		return &Error{Status: res.StatusCode}
 	}
-	slurp, err := ioutil.ReadAll(res.Body)
+	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return &Error{Status: res.StatusCode}
 	}
 	errReply := new(Error)
-	err = json.Unmarshal(slurp, errReply)
+	err = json.Unmarshal(data, errReply)
 	if err != nil {
 		return &Error{Status: res.StatusCode}
 	}

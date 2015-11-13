@@ -878,7 +878,7 @@ func (c *Client) mustActiveConn() error {
 
 // PerformRequest does a HTTP request to Elasticsearch.
 // It returns a response and an error on failure.
-func (c *Client) PerformRequest(method, path string, params url.Values, body interface{}) (*Response, error) {
+func (c *Client) PerformRequest(method, path string, params url.Values, body interface{}, ignoreErrors ...int) (*Response, error) {
 	start := time.Now().UTC()
 
 	c.mu.RLock()
@@ -967,15 +967,9 @@ func (c *Client) PerformRequest(method, path string, params url.Values, body int
 		}
 
 		// Check for errors
-		if err := checkResponse((*http.Request)(req), res); err != nil {
-			retries -= 1
-			if retries <= 0 {
-				return nil, err
-			}
-			retried = true
-			time.Sleep(time.Duration(retryWaitMsec) * time.Millisecond)
-			retryWaitMsec += retryWaitMsec
-			continue // try again
+		if err := checkResponse((*http.Request)(req), res, ignoreErrors...); err != nil {
+			// No retry if request succeeded
+			return nil, err
 		}
 
 		// Tracing
