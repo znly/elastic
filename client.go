@@ -878,6 +878,10 @@ func (c *Client) mustActiveConn() error {
 
 // PerformRequest does a HTTP request to Elasticsearch.
 // It returns a response and an error on failure.
+//
+// Optionally, a list of HTTP error codes to ignore can be passed.
+// This is necessary for services that expect e.g. HTTP status 404 as a
+// valid outcome (Exists, IndicesExists, IndicesTypeExists).
 func (c *Client) PerformRequest(method, path string, params url.Values, body interface{}, ignoreErrors ...int) (*Response, error) {
 	start := time.Now().UTC()
 

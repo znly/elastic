@@ -21,8 +21,9 @@ var (
 // an error returned from Elasticsearch.
 //
 // HTTP status codes between in the range [200..299] are considered successful.
-// Also, HTTP requests with method HEAD that return 404 are considered
-// to be no errors. All other request/response combinations return an error.
+// All other errors are considered errors except they are specified in
+// ignoreErrors. This is necessary because for some services, HTTP status 404
+// is a valid response from Elasticsearch (e.g. the Exists service).
 //
 // The func tries to parse error details as returned from Elasticsearch
 // and encapsulates them in type elastic.Error.
@@ -40,6 +41,8 @@ func checkResponse(req *http.Request, res *http.Response, ignoreErrors ...int) e
 	return createResponseError(res)
 }
 
+// createResponseError creates an Error structure from the HTTP response,
+// its status code and the error information sent by Elasticsearch.
 func createResponseError(res *http.Response) error {
 	if res.Body == nil {
 		return &Error{Status: res.StatusCode}
