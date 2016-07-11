@@ -27,12 +27,13 @@ import (
 type BulkService struct {
 	client *Client
 
-	index    string
-	typ      string
-	requests []BulkableRequest
-	timeout  string
-	refresh  *bool
-	pretty   bool
+	index       string
+	typ         string
+	requests    []BulkableRequest
+	timeout     string
+	refresh     *bool
+	consistency string
+	pretty      bool
 
 	sizeInBytes int64
 }
@@ -78,6 +79,14 @@ func (s *BulkService) Timeout(timeout string) *BulkService {
 // only happens after a specified refresh interval.
 func (s *BulkService) Refresh(refresh bool) *BulkService {
 	s.refresh = &refresh
+	return s
+}
+
+// Consistency sets the consistency level of bulk operations. Values
+// can be one, quorum or all. Elasticsearch's default is quorum.
+// see https://www.elastic.co/guide/en/elasticsearch/reference/1.7/docs-bulk.html#bulk-consistency
+func (s *BulkService) Consistency(consistency string) *BulkService {
+	s.consistency = consistency
 	return s
 }
 
@@ -188,6 +197,9 @@ func (s *BulkService) Do() (*BulkResponse, error) {
 	}
 	if s.timeout != "" {
 		params.Set("timeout", s.timeout)
+	}
+	if s.consistency != "" {
+		params.Set("consistency", string(s.consistency))
 	}
 
 	// Get response
