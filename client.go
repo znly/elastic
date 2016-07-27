@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -100,6 +102,9 @@ var (
 // It is used in NewClient.
 type ClientOptionFunc func(*Client) error
 
+// RequestHook is a function to trace and debug raw request and response to elasticsearch
+type RequestHook func(req *Request, resp *Response, duration time.Duration)
+
 // Client is an Elasticsearch client. Create one by calling NewClient.
 type Client struct {
 	c *http.Client // net/http Client to use for requests
@@ -107,6 +112,8 @@ type Client struct {
 	connsMu sync.RWMutex // connsMu guards the next block
 	conns   []*conn      // all connections
 	cindex  int          // index into conns
+
+	reqHook RequestHook // request hook to trace
 
 	mu                        sync.RWMutex  // guards the next block
 	urls                      []string      // set of URLs passed initially to the client
@@ -321,6 +328,14 @@ func NewSimpleClient(options ...ClientOptionFunc) (*Client, error) {
 	c.mu.Unlock()
 
 	return c, nil
+}
+
+// SetRequestHook sets a hook on every http request
+func SetRequestHook(hook RequestHook) ClientOptionFunc {
+	return func(c *Client) error {
+		c.reqHook = hook
+		return nil
+	}
 }
 
 // SetHttpClient can be used to specify the http.Client to use when making
@@ -980,6 +995,15 @@ func (c *Client) mustActiveConn() error {
 	return ErrNoClient
 }
 
+var hist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	Name: "zenly_elastic_latencies",
+	Help: "zenly elastic latencies histogram. type: search,get,mget",
+
+	Buckets: prometheus.ExponentialBuckets(10.0, 3.0, 3),
+}, []string{"type"})
+
+const slowlogThreshold = 500 * time.Millisecond
+
 // PerformRequest does a HTTP request to Elasticsearch.
 // It returns a response and an error on failure.
 func (c *Client) PerformRequest(method, path string, params url.Values, body interface{}) (*Response, error) {
@@ -1098,6 +1122,10 @@ func (c *Client) PerformRequest(method, path string, params url.Values, body int
 	}
 
 	duration := time.Now().UTC().Sub(start)
+	if c.reqHook != nil {
+		c.reqHook(req, resp, duration)
+	}
+
 	c.infof("%s %s [status:%d, request:%.3fs]",
 		strings.ToUpper(method),
 		req.URL,
